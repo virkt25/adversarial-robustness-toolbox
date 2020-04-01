@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (C) IBM Corporation 2018
+# Copyright (C) IBM Corporation 2020
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
@@ -32,14 +32,14 @@ from scipy.stats import truncnorm
 
 from art.config import ART_NUMPY_DTYPE
 from art.classifiers.classifier import ClassifierGradients
-from art.attacks.evasion.fast_gradient import FastGradientMethod
+from art.attacks.attack import EvasionAttack
 from art.utils import compute_success, get_labels_np_array, check_and_transform_label_format
 from art.exceptions import ClassifierError
 
 logger = logging.getLogger(__name__)
 
 
-class ProjectedGradientDescent(FastGradientMethod):
+class ProjectedGradientDescentTensorFlow(EvasionAttack):
     """
     The Projected Gradient Descent attack is an iterative method in which,
     after each iteration, the perturbation is projected on an lp-ball of specified radius (in
@@ -49,7 +49,17 @@ class ProjectedGradientDescent(FastGradientMethod):
     | Paper link: https://arxiv.org/abs/1706.06083
     """
 
-    attack_params = FastGradientMethod.attack_params + ["max_iter", "random_eps"]
+    attack_params = EvasionAttack.attack_params + [
+        "norm",
+        "eps",
+        "eps_step",
+        "targeted",
+        "num_random_init",
+        "batch_size",
+        "minimal",
+        "max_iter",
+        "random_eps"
+    ]
 
     def __init__(
         self,
@@ -61,10 +71,10 @@ class ProjectedGradientDescent(FastGradientMethod):
         targeted=False,
         num_random_init=0,
         batch_size=1,
-        random_eps=False,
+        random_eps=False
     ):
         """
-        Create a :class:`.ProjectedGradientDescent` instance.
+        Create a :class:`.ProjectedGradientDescentTensorFlow` instance.
 
         :param classifier: A trained classifier.
         :type classifier: :class:`.Classifier`
@@ -89,28 +99,27 @@ class ProjectedGradientDescent(FastGradientMethod):
         :param batch_size: Size of the batch on which adversarial samples are generated.
         :type batch_size: `int`
         """
-        super(ProjectedGradientDescent, self).__init__(
-            classifier,
-            norm=norm,
-            eps=eps,
-            eps_step=eps_step,
-            targeted=targeted,
-            num_random_init=num_random_init,
-            batch_size=batch_size,
-            minimal=False,
-        )
+        super(ProjectedGradientDescentTensorFlow, self).__init__(classifier)
         if not isinstance(classifier, ClassifierGradients):
             raise ClassifierError(self.__class__, [ClassifierGradients], classifier)
 
-        kwargs = {"max_iter": max_iter, "random_eps": random_eps}
-        ProjectedGradientDescent.set_params(self, **kwargs)
+        kwargs = {
+            "norm": norm,
+            "eps": eps,
+            "eps_step": eps_step,
+            "max_iter": max_iter,
+            "targeted": targeted,
+            "num_random_init": num_random_init,
+            "batch_size": batch_size,
+            "random_eps": random_eps
+        }
+        self.set_params(self, **kwargs)
 
-        if self.random_eps:
-            lower, upper = 0, eps
-            mu, sigma = 0, (eps / 2)
-            self.norm_dist = truncnorm((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
-
-        self._project = True
+        # TODO
+        # if self.random_eps:
+        #     lower, upper = 0, eps
+        #     mu, sigma = 0, (eps / 2)
+        #     self.norm_dist = truncnorm((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
 
     def generate(self, x, y=None, **kwargs):
         """
@@ -126,6 +135,8 @@ class ProjectedGradientDescent(FastGradientMethod):
         :return: An array holding the adversarial examples.
         :rtype: `np.ndarray`
         """
+        import tensorflow as tf
+
         y = check_and_transform_label_format(y, self.classifier.nb_classes())
 
         if y is None:
@@ -141,34 +152,42 @@ class ProjectedGradientDescent(FastGradientMethod):
         adv_x_best = None
         rate_best = None
 
-        if self.random_eps:
-            ratio = self.eps_step / self.eps
-            self.eps = np.round(self.norm_dist.rvs(1)[0], 10)
-            self.eps_step = ratio * self.eps
+        # TODO
+        # if self.random_eps:
+        #     ratio = self.eps_step / self.eps
+        #     self.eps = np.round(self.norm_dist.rvs(1)[0], 10)
+        #     self.eps_step = ratio * self.eps
 
-        for _ in range(max(1, self.num_random_init)):
-            adv_x = x.astype(ART_NUMPY_DTYPE)
+        # for _ in range(max(1, self.num_random_init)):
+        #     adv_x = x.astype(ART_NUMPY_DTYPE)
 
-            for i_max_iter in range(self.max_iter):
-                adv_x = self._compute(
-                    adv_x,
-                    x,
-                    targets,
-                    self.eps,
-                    self.eps_step,
-                    self._project,
-                    self.num_random_init > 0 and i_max_iter == 0,
-                )
+        def stop_cond(i, _):
+            return tf.less(i, self.max_iter)
 
-            if self.num_random_init > 1:
-                rate = 100 * compute_success(
-                    self.classifier, x, targets, adv_x, self.targeted, batch_size=self.batch_size
-                )
-                if rate_best is None or rate > rate_best or adv_x_best is None:
-                    rate_best = rate
-                    adv_x_best = adv_x
-            else:
-                adv_x_best = adv_x
+        def main_body(i, adv_x):
+            adv_x = self._compute(
+                adv_x,
+                x,
+                targets,
+                self.eps,
+                self.eps_step,
+                self._project,
+                self.num_random_init > 0 and i_max_iter == 0,
+            )
+            return i + 1, adv_x
+
+        _, adv_x = tf.while_loop(stop_cond, main_body, [tf.zeros([]), adv_x], back_prop=True)
+
+            # TODO
+            # if self.num_random_init > 1:
+            #     rate = 100 * compute_success(
+            #         self.classifier, x, targets, adv_x, self.targeted, batch_size=self.batch_size
+            #     )
+            #     if rate_best is None or rate > rate_best or adv_x_best is None:
+            #         rate_best = rate
+            #         adv_x_best = adv_x
+            # else:
+            #     adv_x_best = adv_x
 
         logger.info(
             "Success rate of attack: %.2f%%",
@@ -178,6 +197,70 @@ class ProjectedGradientDescent(FastGradientMethod):
         )
 
         return adv_x_best
+
+    def _compute_perturbation(self, batch, batch_labels):
+        # Pick a small scalar to avoid division by 0
+        tol = 10e-8
+
+        # Get gradient wrt loss; invert it if attack is targeted
+        grad = self.classifier.loss_gradient(batch, batch_labels) * (1 - 2 * int(self.targeted))
+
+        # Apply norm bound
+        if self.norm == np.inf:
+            grad = np.sign(grad)
+        elif self.norm == 1:
+            ind = tuple(range(1, len(batch.shape)))
+            grad = grad / (np.sum(np.abs(grad), axis=ind, keepdims=True) + tol)
+        elif self.norm == 2:
+            ind = tuple(range(1, len(batch.shape)))
+            grad = grad / (np.sqrt(np.sum(np.square(grad), axis=ind, keepdims=True)) + tol)
+        assert batch.shape == grad.shape
+
+        return grad
+
+    def _apply_perturbation(self, batch, perturbation, eps_step):
+        batch = batch + eps_step * perturbation
+
+        if hasattr(self.classifier, "clip_values") and self.classifier.clip_values is not None:
+            clip_min, clip_max = self.classifier.clip_values
+            batch = np.clip(batch, clip_min, clip_max)
+
+        return batch
+
+    def _compute(self, x, x_init, y, eps, eps_step, project, random_init):
+        if random_init:
+            n = x.shape[0]
+            m = np.prod(x.shape[1:])
+            x_adv = x.astype(ART_NUMPY_DTYPE) + (
+                random_sphere(n, m, eps, self.norm).reshape(x.shape).astype(ART_NUMPY_DTYPE)
+            )
+
+            if hasattr(self.classifier, "clip_values") and self.classifier.clip_values is not None:
+                clip_min, clip_max = self.classifier.clip_values
+                x_adv = np.clip(x_adv, clip_min, clip_max)
+        else:
+            x_adv = x.astype(ART_NUMPY_DTYPE)
+
+        # Compute perturbation with implicit batching
+        for batch_id in range(int(np.ceil(x.shape[0] / float(self.batch_size)))):
+            batch_index_1, batch_index_2 = batch_id * self.batch_size, (batch_id + 1) * self.batch_size
+            batch = x_adv[batch_index_1:batch_index_2]
+            batch_labels = y[batch_index_1:batch_index_2]
+
+            # Get perturbation
+            perturbation = self._compute_perturbation(batch, batch_labels)
+
+            # Apply perturbation and clip
+            x_adv[batch_index_1:batch_index_2] = self._apply_perturbation(batch, perturbation, eps_step)
+
+            if project:
+                perturbation = projection(
+                    x_adv[batch_index_1:batch_index_2] - x_init[batch_index_1:batch_index_2], eps, self.norm
+                )
+                x_adv[batch_index_1:batch_index_2] = x_init[batch_index_1:batch_index_2] + perturbation
+
+        return x_adv
+
 
     def set_params(self, **kwargs):
         """
