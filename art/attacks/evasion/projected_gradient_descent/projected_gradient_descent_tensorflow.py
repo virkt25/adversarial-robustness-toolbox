@@ -28,6 +28,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 
 import numpy as np
+import tensorflow as tf
 from scipy.stats import truncnorm
 
 from art.config import ART_NUMPY_DTYPE
@@ -135,8 +136,6 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
         :return: An array holding the adversarial examples.
         :rtype: `np.ndarray`
         """
-        import tensorflow as tf
-
         y = check_and_transform_label_format(y, self.classifier.nb_classes())
 
         if y is None:
@@ -160,6 +159,8 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
 
         # for _ in range(max(1, self.num_random_init)):
         #     adv_x = x.astype(ART_NUMPY_DTYPE)
+
+        adv_x = self.classifier.get_input_ph
 
         def stop_cond(i, _):
             return tf.less(i, self.max_iter)
@@ -223,44 +224,75 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
 
         if hasattr(self.classifier, "clip_values") and self.classifier.clip_values is not None:
             clip_min, clip_max = self.classifier.clip_values
-            batch = np.clip(batch, clip_min, clip_max)
+            batch = tf.clip_by_value(batch, clip_min, clip_max)
 
         return batch
 
-    def _compute(self, x, x_init, y, eps, eps_step, project, random_init):
-        if random_init:
-            n = x.shape[0]
-            m = np.prod(x.shape[1:])
-            x_adv = x.astype(ART_NUMPY_DTYPE) + (
-                random_sphere(n, m, eps, self.norm).reshape(x.shape).astype(ART_NUMPY_DTYPE)
-            )
+    def _compute(self, x, x_init, y, eps, eps_step, random_init):
+        # TODO
+        # if random_init:
+        #     n = x.shape[0]
+        #     m = np.prod(x.shape[1:])
+        #     x_adv = x.astype(ART_NUMPY_DTYPE) + (
+        #         random_sphere(n, m, eps, self.norm).reshape(x.shape).astype(ART_NUMPY_DTYPE)
+        #     )
+        #
+        #     if hasattr(self.classifier, "clip_values") and self.classifier.clip_values is not None:
+        #         clip_min, clip_max = self.classifier.clip_values
+        #         x_adv = np.clip(x_adv, clip_min, clip_max)
+        # else:
+        #     x_adv = x.astype(ART_NUMPY_DTYPE)
 
-            if hasattr(self.classifier, "clip_values") and self.classifier.clip_values is not None:
-                clip_min, clip_max = self.classifier.clip_values
-                x_adv = np.clip(x_adv, clip_min, clip_max)
-        else:
-            x_adv = x.astype(ART_NUMPY_DTYPE)
+        # Get perturbation
+        perturbation = self._compute_perturbation(x, y)
 
-        # Compute perturbation with implicit batching
-        for batch_id in range(int(np.ceil(x.shape[0] / float(self.batch_size)))):
-            batch_index_1, batch_index_2 = batch_id * self.batch_size, (batch_id + 1) * self.batch_size
-            batch = x_adv[batch_index_1:batch_index_2]
-            batch_labels = y[batch_index_1:batch_index_2]
+        # Apply perturbation and clip
+        x_adv = self._apply_perturbation(x, perturbation, eps_step)
 
-            # Get perturbation
-            perturbation = self._compute_perturbation(batch, batch_labels)
-
-            # Apply perturbation and clip
-            x_adv[batch_index_1:batch_index_2] = self._apply_perturbation(batch, perturbation, eps_step)
-
-            if project:
-                perturbation = projection(
-                    x_adv[batch_index_1:batch_index_2] - x_init[batch_index_1:batch_index_2], eps, self.norm
-                )
-                x_adv[batch_index_1:batch_index_2] = x_init[batch_index_1:batch_index_2] + perturbation
+        # Do projection
+        perturbation = self._projection(x_adv - x_init, eps, self.norm)
+        x_adv = x_init + perturbation
 
         return x_adv
 
+    @staticmethod
+    def _projection(values, eps, norm_p):
+        """
+        Project `values` on the L_p norm ball of size `eps`.
+
+        :param values: Tensor of perturbations to clip.
+        :type values: `tf.Tensor`
+        :param eps: Maximum norm allowed.
+        :type eps: `float`
+        :param norm_p: L_p norm to use for clipping. Only 1, 2 and `np.Inf` supported for now.
+        :type norm_p: `int`
+        :return: Values of `values` after projection.
+        :rtype: `np.ndarray`
+        """
+        # Pick a small scalar to avoid division by 0
+        #tol = 10e-8
+        #values_tmp = values.reshape((values.shape[0], -1))
+
+        if norm_p == 2:
+            pass
+            # TODO
+            # values_tmp = values_tmp * np.expand_dims(
+            #     np.minimum(1.0, eps / (np.linalg.norm(values_tmp, axis=1) + tol)), axis=1
+            # )
+        elif norm_p == 1:
+            pass
+            # TODO
+            # values_tmp = values_tmp * np.expand_dims(
+            #     np.minimum(1.0, eps / (np.linalg.norm(values_tmp, axis=1, ord=1) + tol)), axis=1
+            # )
+        elif norm_p == np.inf:
+            values = tf.clip_by_value(values, -eps, eps)
+        else:
+            raise NotImplementedError(
+                "Values of `norm_p` different from 1, 2 and `np.inf` are currently not supported.")
+
+        # values = values_tmp.reshape(values.shape)
+        return values
 
     def set_params(self, **kwargs):
         """
