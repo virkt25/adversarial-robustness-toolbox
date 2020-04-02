@@ -131,6 +131,16 @@ class TensorFlowClassifier(ClassifierNeuralNetwork, ClassifierGradients, Classif
             self._reduce_labels = False
 
     @property
+    def get_session(self):
+        """
+        Get the session.
+
+        :return: The session.
+        :rtype: `tf.Session`
+        """
+        return self._sess
+
+    @property
     def get_label_ph(self):
         """
         Get the label placeholder.
