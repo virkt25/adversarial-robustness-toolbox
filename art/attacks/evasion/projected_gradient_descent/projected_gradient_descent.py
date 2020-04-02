@@ -34,7 +34,7 @@ from art.attacks.evasion.projected_gradient_descent.projected_gradient_descent_n
 from art.attacks.evasion.projected_gradient_descent.projected_gradient_descent_tensorflow import \
     ProjectedGradientDescentTensorFlow
 from art.classifiers import TensorFlowClassifier
-from art.classifiers.classifier import ClassifierNeuralNetwork, ClassifierGradients
+from art.classifiers.classifier import ClassifierGradients
 from art.attacks.attack import EvasionAttack
 from art.exceptions import ClassifierError
 
@@ -102,8 +102,8 @@ class ProjectedGradientDescent(EvasionAttack):
         :type batch_size: `int`
         """
         super(ProjectedGradientDescent, self).__init__(classifier=classifier)
-        if not isinstance(classifier, ClassifierNeuralNetwork) or not isinstance(classifier, ClassifierGradients):
-            raise ClassifierError(self.__class__, [ClassifierNeuralNetwork, ClassifierGradients], classifier)
+        if not isinstance(classifier, ClassifierGradients):
+            raise ClassifierError(self.__class__, [ClassifierGradients], classifier)
 
         if isinstance(self.classifier, TensorFlowClassifier):
             self._attack = ProjectedGradientDescentTensorFlow(

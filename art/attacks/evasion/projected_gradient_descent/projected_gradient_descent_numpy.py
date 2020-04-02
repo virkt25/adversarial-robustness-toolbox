@@ -39,7 +39,7 @@ from art.exceptions import ClassifierError
 logger = logging.getLogger(__name__)
 
 
-class ProjectedGradientDescent(FastGradientMethod):
+class ProjectedGradientDescentNumpy(FastGradientMethod):
     """
     The Projected Gradient Descent attack is an iterative method in which,
     after each iteration, the perturbation is projected on an lp-ball of specified radius (in
@@ -89,7 +89,7 @@ class ProjectedGradientDescent(FastGradientMethod):
         :param batch_size: Size of the batch on which adversarial samples are generated.
         :type batch_size: `int`
         """
-        super(ProjectedGradientDescent, self).__init__(
+        super(ProjectedGradientDescentNumpy, self).__init__(
             classifier,
             norm=norm,
             eps=eps,
@@ -103,7 +103,7 @@ class ProjectedGradientDescent(FastGradientMethod):
             raise ClassifierError(self.__class__, [ClassifierGradients], classifier)
 
         kwargs = {"max_iter": max_iter, "random_eps": random_eps}
-        ProjectedGradientDescent.set_params(self, **kwargs)
+        self.set_params(self, **kwargs)
 
         if self.random_eps:
             lower, upper = 0, eps
