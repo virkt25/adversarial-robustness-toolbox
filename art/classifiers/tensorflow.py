@@ -135,10 +135,20 @@ class TensorFlowClassifier(ClassifierNeuralNetwork, ClassifierGradients, Classif
         """
         Get the input placeholder.
 
-        :return: the input placeholder.
+        :return: The input placeholder.
         :rtype: `tf.placeholder`
         """
         return self._input_ph
+
+    @property
+    def loss_gradient_framework(self):
+        """
+        Get the loss gradient operator.
+
+        :return: The loss gradient operator.
+        :rtype: `tf.Tensor`
+        """
+        return self._loss_grads
 
     def predict(self, x, batch_size=128, **kwargs):
         """
