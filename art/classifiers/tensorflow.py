@@ -131,6 +131,16 @@ class TensorFlowClassifier(ClassifierNeuralNetwork, ClassifierGradients, Classif
             self._reduce_labels = False
 
     @property
+    def get_label_ph(self):
+        """
+        Get the label placeholder.
+
+        :return: The label placeholder.
+        :rtype: `tf.placeholder`
+        """
+        return self._labels_ph
+
+    @property
     def get_input_ph(self):
         """
         Get the input placeholder.
