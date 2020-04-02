@@ -103,7 +103,7 @@ class ProjectedGradientDescentNumpy(FastGradientMethod):
             raise ClassifierError(self.__class__, [ClassifierGradients], classifier)
 
         kwargs = {"max_iter": max_iter, "random_eps": random_eps}
-        self.set_params(self, **kwargs)
+        self.set_params(**kwargs)
 
         if self.random_eps:
             lower, upper = 0, eps
@@ -196,7 +196,7 @@ class ProjectedGradientDescentNumpy(FastGradientMethod):
         :type batch_size: `int`
         """
         # Save attack-specific parameters
-        super(ProjectedGradientDescent, self).set_params(**kwargs)
+        super(ProjectedGradientDescentNumpy, self).set_params(**kwargs)
 
         if self.eps_step > self.eps:
             raise ValueError("The iteration step `eps_step` has to be smaller than the total attack `eps`.")
