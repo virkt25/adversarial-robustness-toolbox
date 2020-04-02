@@ -114,7 +114,7 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
             "batch_size": batch_size,
             "random_eps": random_eps
         }
-        self.set_params(self, **kwargs)
+        self.set_params(**kwargs)
 
         # TODO
         # if self.random_eps:
@@ -172,7 +172,7 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
                 targets,
                 self.eps,
                 self.eps_step,
-                self._project,
+                False
                 # self.num_random_init > 0 and i_max_iter == 0,
             )
             return i + 1, adv_x
@@ -190,6 +190,14 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
             # else:
             #     adv_x_best = adv_x
 
+        adv_x_best = self.classifier.get_session.run(
+            adv_x,
+            {
+                self.classifier.get_input_ph: x,
+                self.classifier.get_label_ph: targets
+            }
+        )
+        
         logger.info(
             "Success rate of attack: %.2f%%",
             rate_best
@@ -315,7 +323,7 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
         :type batch_size: `int`
         """
         # Save attack-specific parameters
-        super(ProjectedGradientDescent, self).set_params(**kwargs)
+        super(ProjectedGradientDescentTensorFlow, self).set_params(**kwargs)
 
         if self.eps_step > self.eps:
             raise ValueError("The iteration step `eps_step` has to be smaller than the total attack `eps`.")
