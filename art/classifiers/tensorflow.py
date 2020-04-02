@@ -130,6 +130,16 @@ class TensorFlowClassifier(ClassifierNeuralNetwork, ClassifierGradients, Classif
         else:
             self._reduce_labels = False
 
+    @property
+    def get_input_ph(self):
+        """
+        Get the input placeholder.
+
+        :return: the input placeholder.
+        :rtype: `tf.placeholder`
+        """
+        return self._input_ph
+
     def predict(self, x, batch_size=128, **kwargs):
         """
         Perform prediction for a batch of inputs.
