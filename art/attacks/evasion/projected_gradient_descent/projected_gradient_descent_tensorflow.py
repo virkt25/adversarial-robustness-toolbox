@@ -148,6 +148,12 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
         else:
             targets = y
 
+        fd =             {
+                self.classifier.get_input_ph: x,
+                self.classifier.get_label_ph: targets
+            }
+
+
         adv_x_best = None
         rate_best = None
 
@@ -165,16 +171,18 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
         def stop_cond(i, _):
             return tf.less(i, self.max_iter)
 
+        pr = []
         def main_body(i, adv_x):
             adv_x = self._compute(
                 adv_x,
-                x,
-                targets,
+                self.classifier.get_input_ph,
+                self.classifier.get_label_ph,
                 self.eps,
                 self.eps_step,
                 False
                 # self.num_random_init > 0 and i_max_iter == 0,
             )
+            adv_x = tf.Print(adv_x, [tf.reduce_mean(adv_x)], summarize=100)
             return i + 1, adv_x
 
         _, adv_x = tf.while_loop(stop_cond, main_body, [tf.zeros([]), adv_x], back_prop=True)
@@ -189,6 +197,8 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
             #         adv_x_best = adv_x
             # else:
             #     adv_x_best = adv_x
+
+        #self.classifier.get_session.run(pr, fd)
 
         adv_x_best = self.classifier.get_session.run(
             adv_x,
@@ -211,12 +221,19 @@ class ProjectedGradientDescentTensorFlow(EvasionAttack):
         # Pick a small scalar to avoid division by 0
         tol = 10e-8
 
+        #logits = self.classifier.
+        loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(logits=logits, onehot_labels=output_ph))
+
+
         # Get gradient wrt loss; invert it if attack is targeted
-        grad = self.classifier.loss_gradient_framework * (1 - 2 * int(self.targeted))
+        grad = self.classifier.loss_gradient_framework(batch) * (1 - 2 * int(self.targeted))
+
+        grad = tf.Print(grad, [tf.reduce_mean(grad)], summarize=100)
 
         # Apply norm bound
         if self.norm == np.inf:
             grad = tf.sign(grad)
+            grad = tf.stop_gradient(grad)
         elif self.norm == 1:
             pass
             # TODO

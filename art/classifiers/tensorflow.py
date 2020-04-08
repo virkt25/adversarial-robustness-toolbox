@@ -121,8 +121,8 @@ class TensorFlowClassifier(ClassifierNeuralNetwork, ClassifierGradients, Classif
         self._layer_names = self._get_layers()
 
         # Get the loss gradients graph
-        if self._loss is not None:
-            self._loss_grads = tf.gradients(self._loss, self._input_ph)[0]
+#        if self._loss is not None:
+#            self._loss_grads = tf.gradients(self._loss, self._input_ph)[0]
 
         # Check if the loss function requires as input index labels instead of one-hot-encoded labels
         if len(self._labels_ph.shape) == 1:
@@ -160,15 +160,27 @@ class TensorFlowClassifier(ClassifierNeuralNetwork, ClassifierGradients, Classif
         """
         return self._input_ph
 
-    @property
-    def loss_gradient_framework(self):
+    def loss_gradient_framework(self, x):
         """
         Get the loss gradient operator.
 
         :return: The loss gradient operator.
         :rtype: `tf.Tensor`
         """
-        return self._loss_grads
+        import tensorflow as tf
+
+        # Get the loss gradients graph
+        #if self._loss is not None:
+        loss_grads = tf.gradients(self._loss, x)[0]
+
+        print(x, loss_grads)
+        print(self._loss)
+
+        return loss_grads
+
+    #def predict_framework(self, x):
+
+
 
     def predict(self, x, batch_size=128, **kwargs):
         """
