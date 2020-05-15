@@ -462,7 +462,8 @@ class TensorFlowClassifier(ClassGradientsMixin, ClassifierMixin, TensorFlowEstim
             raise TypeError("Layer must be of type `str` or `int`. Received %s." % layer)
 
         if intermediate:
-            return layer_tensor
+            placeholder = tf.placeholder(tf.float32, shape=x.shape)
+            return placeholder, layer_tensor
 
         # Apply preprocessing
         x_preprocessed, _ = self._apply_preprocessing(x, y=None, fit=False)
@@ -486,19 +487,30 @@ class TensorFlowClassifier(ClassGradientsMixin, ClassifierMixin, TensorFlowEstim
 
         return results
 
-    def custom_gradient(self, nn_function):
+    def custom_gradient(self, nn_function, tensors, input_values):
         """
-        Returns the gradient of the nn_function with respect to vars
+        Returns the gradient of the nn_function with respect to model input
 
-        :param nn_function: an intermediate tensor representation of the gradient function
-        :type nn_function: a Keras tensor
-        :param vars: the variables to differentiate
-        :type vars: `list`
+        :param nn_function: an intermediate tensor representation of the function to differentiate
+        :type nn_function: a TF tensor
+        :param tensors: the tensors or variables to differentiate with respect to
+        :type tensors: `list`
+        :param input_values: the inputs to evaluate the gradient
+        :type input_values: `list`
         :return: the gradient of the function w.r.t vars
         :rtype: `np.ndarray`
         """
+        raise NotImplementedError
+        # import tensorflow as tf
+        #
+        # sess = tf.Session()
+        # grads = tf.gradients(nn_function, tensors[0])[0]
+        # feed_dict = {tensor: input_val for tensor, input_val in zip(tensors, input_values)}
+        # grad, = sess.run(grads, feed_dict=feed_dict)
+        # return grad
+
     def get_input_layer(self):
-        return self._input
+        return self._input_ph
 
     def set_learning_phase(self, train):
         """
@@ -1005,7 +1017,7 @@ class TensorFlowV2Classifier(ClassGradientsMixin, ClassifierMixin, TensorFlowV2E
         else:
             return None
 
-    def get_activations(self, x, layer, batch_size=128):
+    def get_activations(self, x, layer, batch_size=128, intermediate=False):
         """
         Return the output of the specified layer for input `x`. `layer` is specified by layer index (between 0 and
         `nb_layers - 1`) or by name. The number of layers can be determined by counting the results returned by
@@ -1043,6 +1055,13 @@ class TensorFlowV2Classifier(ClassGradientsMixin, ClassifierMixin, TensorFlowV2E
 
             activation_model = tf.keras.Model(self._model.layers[0].input, self._model.layers[i_layer].output)
 
+            if intermediate:
+                # placeholder = self._model.layers[0].input
+                # placeholder = tf.convert_to_tensor(x)
+                # layer_tensor = activation_model(placeholder)
+                # return placeholder, layer_tensor
+                raise NotImplementedError
+
             # Apply preprocessing
             x_preprocessed, _ = self._apply_preprocessing(x=x, y=None, fit=False)
 
@@ -1058,6 +1077,33 @@ class TensorFlowV2Classifier(ClassGradientsMixin, ClassifierMixin, TensorFlowV2E
             return activations
         else:
             return None
+
+    def custom_gradient(self, nn_function, tensors, input_values):
+        """
+        Returns the gradient of the nn_function with respect to model input
+
+        :param nn_function: an intermediate tensor representation of the function to differentiate
+        :type nn_function: a Keras tensor
+        :param tensors: the tensors or variables to differentiate with respect to
+        :type tensors: `list`
+        :param input_values: the inputs to evaluate the gradient
+        :type input_values: `list`
+        :return: the gradient of the function w.r.t vars
+        :rtype: `np.ndarray`
+        """
+        raise NotImplementedError
+        # import tensorflow as tf
+        # with tf.GradientTape() as g:
+        #     g.watch(tensors[0])
+        #
+        # grads = g.gradient(nn_function, tensors[0])
+        # return grads.numpy()
+        # # outputs = tf.function(tensors, [grads])
+        # # return outputs(input_values)
+
+    def get_input_layer(self):
+        raise NotImplementedError
+        # return self._model.layers[0].input
 
     def set_learning_phase(self, train):
         """
